@@ -30,6 +30,12 @@ from jupyter_scheduler.models import (
 from jupyter_scheduler.pydantic_v1 import ValidationError
 
 
+def _http_error_for_validation(error: ValidationError) -> HTTPError:
+    """Tag rule failures are client errors. Other model failures stay 500."""
+    status = 400 if "email tag" in str(error).lower() else 500
+    return HTTPError(status, str(error))
+
+
 class JobHandlersMixin:
     _scheduler = None
     _environments_manager = None
@@ -128,7 +134,7 @@ class JobDefinitionHandler(ExtensionHandlerMixin, JobHandlersMixin, APIHandler):
             )
         except ValidationError as e:
             self.log.exception(e)
-            raise HTTPError(500, str(e)) from e
+            raise _http_error_for_validation(e) from e
         except InputUriError as e:
             self.log.exception(e)
             raise HTTPError(500, str(e)) from e
@@ -154,7 +160,7 @@ class JobDefinitionHandler(ExtensionHandlerMixin, JobHandlersMixin, APIHandler):
             )
         except ValidationError as e:
             self.log.exception(e)
-            raise HTTPError(500, str(e)) from e
+            raise _http_error_for_validation(e) from e
         except SchedulerError as e:
             self.log.exception(e)
             raise HTTPError(500, str(e)) from e

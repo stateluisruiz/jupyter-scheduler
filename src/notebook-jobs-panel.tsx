@@ -209,7 +209,8 @@ export class NotebookJobsPanel extends VDomRenderer<JobsModel> {
       timezone: jobDef.timezone || 'UTC',
       scheduleInterval: 'custom',
       inputFileSnapshot: jobDef.inputFile,
-      updateTime: jobDef.updateTime
+      updateTime: jobDef.updateTime,
+      tags: jobDef.tags ? [...jobDef.tags] : []
     };
   }
 
@@ -294,6 +295,7 @@ export class NotebookJobsPanel extends VDomRenderer<JobsModel> {
                   showJobDefinitionDetail={this.showJobDefinitionDetail.bind(
                     this
                   )}
+                  advancedOptions={this._advancedOptions}
                 />
               )}
             </ErrorBoundary>

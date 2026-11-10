@@ -594,6 +594,7 @@ async def test_post_job_definition_scheduler_error(jp_fetch):
                 "input_uri": "notebook.ipynb",
                 "name": "a job",
                 "runtime_environment_name": "environment_a",
+                "tags": ["user@state.co.us"],
             }
             await jp_fetch("scheduler", "job_definitions", method="POST", body=json.dumps(payload))
         assert expected_http_error(e, 500, "Scheduler error")
@@ -609,6 +610,7 @@ async def test_post_job_definition_unexpected_error(jp_fetch):
                 "input_uri": "notebook.ipynb",
                 "name": "a job",
                 "runtime_environment_name": "environment_a",
+                "tags": ["user@state.co.us"],
             }
             await jp_fetch("scheduler", "job_definitions", method="POST", body=json.dumps(payload))
         assert expected_http_error(

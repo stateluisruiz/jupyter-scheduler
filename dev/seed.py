@@ -67,6 +67,7 @@ def create_random_job_def(index: int, env: str) -> CreateJobDefinition:
         schedule=schedule,
         active=active,
         runtime_environment_name=env,
+        tags=["seed@state.co.us"],
     )
 
 

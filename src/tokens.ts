@@ -3,6 +3,7 @@ import {
   ICreateJobModel,
   IJobDefinitionModel,
   IJobDetailModel,
+  IUpdateJobDefinitionModel,
   JobsView
 } from './model';
 
@@ -35,10 +36,18 @@ export namespace Scheduler {
     handleModelChange: (model: IJobDefinitionModel) => void;
   }
 
+  interface IAdvancedOptionsEditJobDefinitionProps
+    extends IAdvancedOptionsSharedProps {
+    jobsView: JobsView.EditJobDefinition;
+    model: IUpdateJobDefinitionModel;
+    handleModelChange: (model: IUpdateJobDefinitionModel) => void;
+  }
+
   export type IAdvancedOptionsProps =
     | IAdvancedOptionsCreateProps
     | IAdvancedOptionsJobDetailProps
-    | IAdvancedOptionsJobDefinitionDetailProps;
+    | IAdvancedOptionsJobDefinitionDetailProps
+    | IAdvancedOptionsEditJobDefinitionProps;
 
   export type IAdvancedOptions = React.FC<IAdvancedOptionsProps>;
 

@@ -1,6 +1,6 @@
-import React, { ChangeEvent } from 'react';
+import React, { ChangeEvent, useEffect } from 'react';
 
-import { FormLabel, Stack, TextField } from '@mui/material';
+import { FormHelperText, FormLabel, Stack, TextField } from '@mui/material';
 
 import { Cluster } from './components/cluster';
 import { AddButton, DeleteButton } from './components/icon-buttons';
@@ -8,6 +8,28 @@ import { useTranslator } from './hooks';
 import { JobsView } from './model';
 import { Scheduler } from './tokens';
 import { LabeledValue } from './components/labeled-value';
+import {
+  emailTagErrors,
+  MAX_EMAIL_TAGS,
+  TagFieldError,
+  TagListError
+} from './util/tag-validation';
+
+function tagsAreEditable(jobsView: JobsView): boolean {
+  return (
+    jobsView === JobsView.CreateForm || jobsView === JobsView.EditJobDefinition
+  );
+}
+
+function tagsAreRequired(props: Scheduler.IAdvancedOptionsProps): boolean {
+  if (props.jobsView === JobsView.EditJobDefinition) {
+    return true;
+  }
+  if (props.jobsView === JobsView.CreateForm) {
+    return props.model.createType === 'JobDefinition';
+  }
+  return false;
+}
 
 const AdvancedOptions = (
   props: Scheduler.IAdvancedOptionsProps
@@ -15,6 +37,58 @@ const AdvancedOptions = (
   const formPrefix = 'jp-create-job-advanced-';
 
   const trans = useTranslator('jupyterlab');
+  const editable = tagsAreEditable(props.jobsView);
+  const required = tagsAreRequired(props);
+  const createType =
+    props.jobsView === JobsView.CreateForm ? props.model.createType : undefined;
+
+  const fieldMessage = (error: TagFieldError): string => {
+    if (error === 'blank') {
+      return trans.__('Enter an email address');
+    }
+    return trans.__('Enter a valid email address');
+  };
+
+  const listMessage = (error: TagListError): string => {
+    if (error === 'required') {
+      return trans.__('At least one email tag is required');
+    }
+    if (error === 'max') {
+      return trans.__('At most 5 email tags are allowed');
+    }
+    return '';
+  };
+
+  useEffect(() => {
+    if (!editable) {
+      return;
+    }
+
+    const result = emailTagErrors(props.model.tags, required);
+    const next: Scheduler.ErrorsType = {};
+    const summary = listMessage(result.list);
+    if (summary) {
+      next.tags = summary;
+    }
+    Object.entries(result.fields).forEach(([idx, error]) => {
+      next[`tag-${idx}`] = fieldMessage(error);
+    });
+    props.handleErrorsChange(next);
+  }, [props.model.tags, props.jobsView, createType]);
+
+  const updateTags = (tags: string[]) => {
+    if (props.jobsView === JobsView.CreateForm) {
+      props.handleModelChange({
+        ...props.model,
+        tags
+      });
+    } else if (props.jobsView === JobsView.EditJobDefinition) {
+      props.handleModelChange({
+        ...props.model,
+        tags
+      });
+    }
+  };
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (props.jobsView !== JobsView.CreateForm) {
@@ -28,7 +102,7 @@ const AdvancedOptions = (
   };
 
   const handleTagChange = (event: ChangeEvent<HTMLInputElement>) => {
-    if (props.jobsView !== JobsView.CreateForm) {
+    if (!editable) {
       return;
     }
 
@@ -36,41 +110,30 @@ const AdvancedOptions = (
     const tagIdxMatch = name.match(/^tag-(\d+)$/);
 
     if (tagIdxMatch === null) {
-      return null;
+      return;
     }
 
-    const newTags = props.model.tags ?? [];
+    const newTags = [...(props.model.tags ?? [])];
     newTags[parseInt(tagIdxMatch[1])] = value;
-
-    props.handleModelChange({
-      ...props.model,
-      tags: newTags
-    });
+    updateTags(newTags);
   };
 
   const addTag = () => {
-    if (props.jobsView !== JobsView.CreateForm) {
+    if (!editable || (props.model.tags ?? []).length >= MAX_EMAIL_TAGS) {
       return;
     }
 
-    const newTags = [...(props.model.tags ?? []), ''];
-    props.handleModelChange({
-      ...props.model,
-      tags: newTags
-    });
+    updateTags([...(props.model.tags ?? []), '']);
   };
 
   const deleteTag = (idx: number) => {
-    if (props.jobsView !== JobsView.CreateForm) {
+    if (!editable) {
       return;
     }
 
-    const newTags = props.model.tags ?? [];
+    const newTags = [...(props.model.tags ?? [])];
     newTags.splice(idx, 1);
-    props.handleModelChange({
-      ...props.model,
-      tags: newTags
-    });
+    updateTags(newTags);
   };
 
   const tags = props.model.tags ?? [];
@@ -86,10 +149,11 @@ const AdvancedOptions = (
               name={`tag-${idx}`}
               value={tag}
               onChange={handleTagChange}
+              error={!!props.errors[`tag-${idx}`]}
+              helperText={props.errors[`tag-${idx}`] ?? ''}
             />
             <DeleteButton
               onClick={() => {
-                // Remove tag
                 deleteTag(idx);
                 return false;
               }}
@@ -98,15 +162,17 @@ const AdvancedOptions = (
             />
           </Cluster>
         ))}
-        <Cluster justifyContent="flex-start">
-          <AddButton
-            onClick={(e: React.MouseEvent) => {
-              addTag();
-              return false;
-            }}
-            title={trans.__('Add new tag')}
-          />
-        </Cluster>
+        {tags.length < MAX_EMAIL_TAGS && (
+          <Cluster justifyContent="flex-start">
+            <AddButton
+              onClick={() => {
+                addTag();
+                return false;
+              }}
+              title={trans.__('Add new tag')}
+            />
+          </Cluster>
+        )}
       </Stack>
     );
   };
@@ -136,14 +202,15 @@ const AdvancedOptions = (
     );
   };
 
-  // Tags look different when they're for display or for editing.
-  const tagsDisplay: JSX.Element | null =
-    props.jobsView === JobsView.CreateForm ? createTags() : showTags();
+  const tagsDisplay: JSX.Element | null = editable ? createTags() : showTags();
 
-  // The idempotency token is only used for jobs, not for job definitions
   const idemTokenLabel = trans.__('Idempotency token');
   const idemTokenName = 'idempotencyToken';
   const idemTokenId = `${formPrefix}${idemTokenName}`;
+  const helperText = required
+    ? trans.__('Each tag is an email address. 1 to 5 required.')
+    : trans.__('Each tag is an email address. Up to 5.');
+
   return (
     <Stack spacing={4}>
       {props.jobsView === JobsView.JobDetail && (
@@ -166,6 +233,10 @@ const AdvancedOptions = (
           />
         )}
       <FormLabel component="legend">{trans.__('Tags')}</FormLabel>
+      {editable && <FormHelperText>{helperText}</FormHelperText>}
+      {editable && props.errors.tags && (
+        <FormHelperText error>{props.errors.tags}</FormHelperText>
+      )}
       {tagsDisplay}
     </Stack>
   );

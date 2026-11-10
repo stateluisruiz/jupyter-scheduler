@@ -165,6 +165,13 @@ export function CreateJob(props: ICreateJobProps): JSX.Element {
     prevEnvName.current = props.model.environment;
   }, [props.model.environment, envsByName]);
 
+  // Email tags are required to schedule a job, so show that section.
+  useEffect(() => {
+    if (props.model.createType === 'JobDefinition') {
+      setAdvancedOptionsExpanded(true);
+    }
+  }, [props.model.createType]);
+
   // If any error message is "truthy" (not null or empty), the form should not be submitted.
   const anyAdvancedErrors = Object.keys(advancedOptionsErrors).some(
     key => !!advancedOptionsErrors[key]

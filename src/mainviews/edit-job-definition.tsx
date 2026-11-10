@@ -28,6 +28,7 @@ export type EditJobDefinitionProps = {
   handleModelChange: (model: IUpdateJobDefinitionModel) => void;
   showListView: (view: JobsView.ListJobDefinitions) => void;
   showJobDefinitionDetail: (jobDefId: string) => void;
+  advancedOptions: React.FunctionComponent<Scheduler.IAdvancedOptionsProps>;
 };
 
 function EditJobDefinitionBody(props: EditJobDefinitionProps): JSX.Element {
@@ -38,10 +39,13 @@ function EditJobDefinitionBody(props: EditJobDefinitionProps): JSX.Element {
   const [utcOnly, setUtcOnly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Scheduler.ErrorsType>({});
+  const [tagErrors, setTagErrors] = useState<Scheduler.ErrorsType>({});
   const [displayError, setDisplayError] = useState<React.ReactNode | null>(
     null
   );
-  const hasErrors = Object.keys(fieldErrors).some(key => !!fieldErrors[key]);
+  const hasErrors =
+    Object.keys(fieldErrors).some(key => !!fieldErrors[key]) ||
+    Object.keys(tagErrors).some(key => !!tagErrors[key]);
 
   /**
    * Effect: fetch environment list on initial render, and set timezone
@@ -73,7 +77,8 @@ function EditJobDefinitionBody(props: EditJobDefinitionProps): JSX.Element {
     ss.updateJobDefinition(props.model.definitionId, {
       schedule: props.model.schedule,
       timezone: props.model.timezone,
-      input_uri: props.model.inputFileSnapshot
+      input_uri: props.model.inputFileSnapshot,
+      tags: props.model.tags ?? []
     })
       .then(() => {
         props.showJobDefinitionDetail(props.model.definitionId);
@@ -97,6 +102,13 @@ function EditJobDefinitionBody(props: EditJobDefinitionProps): JSX.Element {
         </Alert>
       )}
       <InputFileSnapshot inputFileSnapshot={props.model.inputFileSnapshot} />
+      <props.advancedOptions
+        jobsView={JobsView.EditJobDefinition}
+        model={props.model}
+        handleModelChange={props.handleModelChange}
+        errors={tagErrors}
+        handleErrorsChange={setTagErrors}
+      />
       <InputLabel>{trans.__('Schedule')}</InputLabel>
       <ScheduleInputs
         idPrefix=""

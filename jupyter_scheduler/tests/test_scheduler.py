@@ -25,6 +25,7 @@ def test_create_job_definition(jp_scheduler):
                     runtime_environment_name="default",
                     name="hello world",
                     output_formats=["ipynb"],
+                    tags=["user@state.co.us"],
                 )
             )
 
@@ -37,6 +38,7 @@ def test_create_job_definition(jp_scheduler):
         assert "helloworld.ipynb" == definition.input_filename
         assert "default" == definition.runtime_environment_name
         assert "hello world" == definition.name
+        assert ["user@state.co.us"] == definition.tags
 
 
 job_definition_1 = {

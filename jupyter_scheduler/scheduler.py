@@ -586,45 +586,53 @@ class Scheduler(BaseScheduler):
                 filtered_query.one()
             )
 
-            if (
-                (
-                    not model.input_uri
-                    or (
-                        model.input_uri
-                        and describe_job_definition.input_filename
-                        == os.path.basename(model.input_uri)
-                    )
-                )
+            input_unchanged = not model.input_uri or (
+                describe_job_definition.input_filename == os.path.basename(model.input_uri)
+            )
+            schedule_unchanged = (
+                input_unchanged
                 and describe_job_definition.schedule == model.schedule
                 and describe_job_definition.timezone == model.timezone
                 and (
                     model.active == None
                     or describe_job_definition.active == model.active
                 )
-            ):
+            )
+            current_tags = list(describe_job_definition.tags or [])
+            tags_changed = model.tags is not None and list(model.tags) != current_tags
+
+            # A tags-only edit used to be discarded here, because the edit form
+            # resends the unchanged schedule, timezone, and input file.
+            if schedule_unchanged and not tags_changed:
                 return
 
-            updates = model.dict(exclude_none=True, exclude={"input_uri"})
+            if schedule_unchanged:
+                filtered_query.update({"tags": list(model.tags)})
+                session.commit()
+                schedule = describe_job_definition.schedule
+            else:
+                updates = model.dict(exclude_none=True, exclude={"input_uri"})
 
-            if model.input_uri:
-                new_input_filename = os.path.basename(model.input_uri)
-                staging_paths = self.get_staging_paths(describe_job_definition)
-                staging_directory = os.path.dirname(staging_paths["input"])
-                self.copy_input_file(
-                    model.input_uri, os.path.join(staging_directory, new_input_filename)
+                if model.input_uri:
+                    new_input_filename = os.path.basename(model.input_uri)
+                    staging_paths = self.get_staging_paths(describe_job_definition)
+                    staging_directory = os.path.dirname(staging_paths["input"])
+                    self.copy_input_file(
+                        model.input_uri, os.path.join(staging_directory, new_input_filename)
+                    )
+                    updates["input_filename"] = new_input_filename
+
+                filtered_query.update(updates)
+                session.commit()
+
+                schedule = (
+                    session.query(JobDefinition.schedule)
+                    .filter(JobDefinition.job_definition_id == job_definition_id)
+                    .scalar()
                 )
-                updates["input_filename"] = new_input_filename
 
-            filtered_query.update(updates)
-            session.commit()
-
-            schedule = (
-                session.query(JobDefinition.schedule)
-                .filter(JobDefinition.job_definition_id == job_definition_id)
-                .scalar()
-            )
-
-        if self.task_runner and schedule:
+        # Tag edits do not change when the job next runs.
+        if not schedule_unchanged and self.task_runner and schedule:
             self.task_runner.update_job_definition(job_definition_id, model)
 
     def delete_job_definition(self, job_definition_id: str):

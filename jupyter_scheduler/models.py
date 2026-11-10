@@ -1,4 +1,5 @@
 import os
+import re
 from enum import Enum
 from typing import Dict, List, Optional, Union
 
@@ -7,8 +8,40 @@ from jupyter_scheduler.pydantic_v1 import BaseModel, root_validator
 Tags = List[str]
 EnvironmentParameterValues = Union[int, float, bool, str]
 
-EMAIL_RE = ""
+MAX_EMAIL_TAGS = 5
+EMAIL_RE = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 SCHEDULE_RE = ""
+
+
+def normalize_email_tags(tags: Optional[List[str]], *, required: bool) -> Optional[List[str]]:
+    """Return stripped email tags, or None when an update omits the field.
+
+    Scheduled job definitions require 1 to 5 addresses. An omitted value on
+    update leaves the stored tags alone. A present value, including an empty
+    list, must already be valid emails.
+    """
+    if tags is None:
+        if required:
+            raise ValueError("At least one email tag is required")
+        return None
+
+    if not isinstance(tags, list):
+        raise ValueError("Email tags must be a list of email addresses")
+
+    cleaned = []
+    for tag in tags:
+        if not isinstance(tag, str):
+            raise ValueError("Each email tag must be an email address")
+        value = tag.strip()
+        if not EMAIL_RE.fullmatch(value):
+            raise ValueError(f"Invalid email tag: {tag!r}")
+        cleaned.append(value)
+
+    if len(cleaned) < 1:
+        raise ValueError("At least one email tag is required")
+    if len(cleaned) > MAX_EMAIL_TAGS:
+        raise ValueError("At most 5 email tags are allowed")
+    return cleaned
 
 
 class RuntimeEnvironment(BaseModel):
@@ -217,6 +250,11 @@ class CreateJobDefinition(BaseModel):
 
         return values
 
+    @root_validator(skip_on_failure=True)
+    def check_email_tags(cls, values) -> Dict:
+        values["tags"] = normalize_email_tags(values.get("tags"), required=True)
+        return values
+
 
 class DescribeJobDefinition(BaseModel):
     input_filename: str = None
@@ -253,6 +291,11 @@ class UpdateJobDefinition(BaseModel):
     active: Optional[bool] = None
     compute_type: Optional[str] = None
     input_uri: Optional[str] = None
+
+    @root_validator(skip_on_failure=True)
+    def check_email_tags(cls, values) -> Dict:
+        values["tags"] = normalize_email_tags(values.get("tags"), required=False)
+        return values
 
 
 class ListJobDefinitionsQuery(BaseModel):

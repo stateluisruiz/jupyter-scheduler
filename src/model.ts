@@ -131,6 +131,7 @@ export interface IUpdateJobDefinitionModel
   environment: string;
   inputFileSnapshot: string;
   updateTime: number;
+  tags?: string[];
 }
 
 export function emptyUpdateJobDefinitionModel(): IUpdateJobDefinitionModel {
